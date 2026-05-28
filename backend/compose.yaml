@@ -1,0 +1,24 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "3001:3001"
+    volumes:
+      - .:/app
+    environment:
+      - NODE_ENV=development
+  db:
+    image: postgres:15.18
+    environment:
+      POSTGRES_USER: newsnap
+      POSTGRES_PASSWORD: newsnap
+      POSTGRES_DB: newsnap
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:

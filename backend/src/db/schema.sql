@@ -1,0 +1,11 @@
+-- このファイルは参照用です。
+-- テーブル定義の正本は src/db/schema.ts（Drizzle スキーマ）です。
+--
+-- マイグレーション SQL は drizzle-kit で自動生成されます:
+--
+--   npm run db:generate   # schema.ts の差分から SQL を生成 → drizzle/ に出力
+--   npm run db:migrate    # 生成された SQL を DB に適用
+--
+-- 初回セットアップ:
+--   DATABASE_URL=postgresql://... npm run db:generate
+--   DATABASE_URL=postgresql://... npm run db:migrate
