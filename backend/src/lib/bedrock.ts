@@ -11,7 +11,7 @@ const client = new BedrockRuntimeClient({
   region: process.env.AWS_REGION ?? "ap-northeast-1",
 });
 
-const MODEL_ID = "us.anthropic.claude-sonnet-4-6";
+const MODEL_ID = "global.anthropic.claude-sonnet-4-6";
 
 export async function generateSummary(
   title: string,

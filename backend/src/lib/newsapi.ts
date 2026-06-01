@@ -29,7 +29,7 @@ export async function fetchNews({
       ? `${BASE}/everything`
       : `${BASE}/top-headlines`;
 
-  const params = new URLSearchParams({ apiKey: API_KEY, language: "ja", pageSize: "20" });
+  const params = new URLSearchParams({ apiKey: API_KEY, pageSize: "20" });
   if (keyword) params.set("q", keyword);
   if (category) params.set("category", category);
 

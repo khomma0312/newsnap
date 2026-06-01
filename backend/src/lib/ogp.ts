@@ -10,7 +10,7 @@ type OgpData = {
 
 export async function fetchOgp(url: string): Promise<OgpData> {
   const res = await fetch(url, {
-    headers: { "User-Agent": "NewsSnapBot/1.0" },
+    headers: { "User-Agent": "NewsnapBot/1.0" },
     redirect: "follow",
   });
 

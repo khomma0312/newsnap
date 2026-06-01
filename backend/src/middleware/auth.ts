@@ -24,6 +24,7 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
   }
 
   const token = authHeader.slice(7);
+
   try {
     const { payload } = await jwtVerify(token, JWKS, {
       issuer: ISSUER,
@@ -33,6 +34,6 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
     c.set("userId", payload.sub as string);
     await next();
   } catch {
-    return c.json({ error: "Invalid token" }, 401);
+    return c.json({ error: "Unauthorized" }, 401);
   }
 };
