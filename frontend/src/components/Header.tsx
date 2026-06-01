@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { isLoggedIn, buildLoginUrl, buildLogoutUrl, clearTokens } from "@/lib/auth";
 
 export default function Header() {
-  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const [loggedIn, setLoggedIn] = useState<boolean | null>(() =>
+    typeof window === "undefined" ? null : isLoggedIn()
+  );
 
   useEffect(() => {
     setLoggedIn(isLoggedIn());
@@ -17,20 +19,40 @@ export default function Header() {
 
   return (
     <header style={{
+      backgroundColor: "#fff",
+      borderBottom: "1px solid #e5e7eb",
+      position: "sticky",
+      top: 0,
+      zIndex: 10,
       display: "flex",
-      justifyContent: "space-between",
       alignItems: "center",
-      padding: "0.75rem 1.5rem",
-      borderBottom: "1px solid #e0e0e0",
+      justifyContent: "space-between",
+      padding: "0 1.5rem",
+      height: "3.5rem",
     }}>
-      <span style={{ fontWeight: "bold", fontSize: "1.1rem" }}>NewsSnap</span>
+      <span style={{ fontWeight: 700, fontSize: "1.1rem", color: "#111827" }}>Newsnap</span>
       {loggedIn === true && (
-        <button onClick={handleLogout} style={{ cursor: "pointer" }}>
+        <button
+          onClick={handleLogout}
+          style={{ fontSize: "0.875rem", color: "#4b5563", cursor: "pointer", background: "none", border: "none" }}
+        >
           ログアウト
         </button>
       )}
       {loggedIn === false && (
-        <a href={buildLoginUrl()}>ログイン</a>
+        <a
+          href={buildLoginUrl()}
+          style={{
+            fontSize: "0.875rem",
+            backgroundColor: "#2563eb",
+            color: "#fff",
+            padding: "0.375rem 1rem",
+            borderRadius: "0.375rem",
+            textDecoration: "none",
+          }}
+        >
+          ログイン
+        </a>
       )}
     </header>
   );

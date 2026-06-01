@@ -11,6 +11,7 @@ import type {
   CreateTagRequest,
   ExploreQuery,
 } from "@/types";
+import { refreshIdToken, saveTokens, clearTokens } from "@/lib/auth";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -18,18 +19,38 @@ async function fetchWithAuth<T>(
   path: string,
   init?: RequestInit
 ): Promise<T> {
-  // クライアントサイドでトークンを取得（/callback で localStorage に保存する想定）
-  const token =
+  const getToken = () =>
     typeof window !== "undefined" ? localStorage.getItem("id_token") : null;
 
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init?.headers,
-    },
-  });
+  const doFetch = (token: string | null) =>
+    fetch(`${BASE_URL}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...init?.headers,
+      },
+    });
+
+  let res = await doFetch(getToken());
+
+  if (res.status === 401) {
+    let newToken: string | null = null;
+    try {
+      newToken = await refreshIdToken();
+    } catch {
+      throw new Error("Network error during token refresh");
+    }
+
+    if (newToken) {
+      saveTokens(newToken);
+      res = await doFetch(newToken);
+    } else {
+      clearTokens();
+      if (typeof window !== "undefined") window.location.href = "/";
+      throw new Error("Session expired");
+    }
+  }
 
   if (!res.ok) {
     throw new Error(`API error: ${res.status} ${res.statusText}`);

@@ -22,12 +22,14 @@ function CallbackContent() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code }),
     })
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Token exchange failed: ${res.status}`);
+        return res.json();
+      })
       .then((data: { id_token: string; refresh_token?: string }) => {
         saveTokens(data.id_token, data.refresh_token);
-        router.replace("/");
+        window.location.href = "/";
       })
-      .catch(() => router.replace("/"));
   }, [router, searchParams]);
 
   return <p>ログイン処理中...</p>;

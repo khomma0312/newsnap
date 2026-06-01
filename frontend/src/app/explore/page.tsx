@@ -1,12 +1,10 @@
 "use client";
 
-/**
- * /explore ニュース探索（NewsAPI）
- */
-
 import { useState } from "react";
 import { exploreNews, createArticle } from "@/lib/api";
 import type { NewsArticle } from "@/types";
+import { isLoggedIn } from "@/lib/auth";
+import { useRouter } from "next/navigation";
 
 const CATEGORIES = ["", "technology", "business", "health", "science", "sports", "entertainment"];
 
@@ -15,6 +13,13 @@ export default function ExplorePage() {
   const [category, setCategory] = useState("");
   const [results, setResults] = useState<NewsArticle[]>([]);
   const [saved, setSaved] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState<Set<string>>(new Set());
+  const router = useRouter();
+
+  if (isLoggedIn() === false) {
+    router.replace("/");
+    return null;
+  }
 
   const handleSearch = async () => {
     const articles = await exploreNews({ keyword, category });
@@ -22,45 +27,70 @@ export default function ExplorePage() {
   };
 
   const handleSave = async (article: NewsArticle) => {
-    await createArticle({ url: article.url });
-    setSaved((prev) => new Set(prev).add(article.url));
+    setSaving((prev) => new Set(prev).add(article.url));
+    try {
+      await createArticle({ url: article.url });
+      setSaved((prev) => new Set(prev).add(article.url));
+    } finally {
+      setSaving((prev) => { const next = new Set(prev); next.delete(article.url); return next; });
+    }
   };
 
   return (
-    <main style={{ maxWidth: 900, margin: "0 auto", padding: "2rem 1rem" }}>
-      <h1>ニュースを探す</h1>
+    <main className="max-w-5xl mx-auto px-6 py-8">
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">ニュースを探す</h1>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      <div className="flex gap-2 mb-8">
         <input
           type="text"
           placeholder="キーワード"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
+          className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
         />
-        <select value={category} onChange={(e) => setCategory(e.target.value)}>
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+        >
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>{c || "カテゴリなし"}</option>
           ))}
         </select>
-        <button onClick={handleSearch}>検索</button>
+        <button
+          onClick={handleSearch}
+          className="bg-primary text-white px-4 py-2 rounded-md text-sm hover:bg-primary-dark transition-colors"
+        >
+          検索
+        </button>
       </div>
 
-      <section>
+      <section className="space-y-4">
         {results.map((article) => (
-          <article key={article.url} style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginTop: 16 }}>
+          <article key={article.url} className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-sm transition-shadow">
             {article.urlToImage && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={article.urlToImage} alt={article.title} style={{ width: "100%", height: 160, objectFit: "cover" }} />
+              <img src={article.urlToImage} alt={article.title} className="w-full h-40 object-cover" />
             )}
-            <h2>{article.title}</h2>
-            <p>{article.description}</p>
-            <small>{article.source.name} · {new Date(article.publishedAt).toLocaleDateString("ja-JP")}</small>
-            <div style={{ marginTop: 8 }}>
-              {saved.has(article.url) ? (
-                <span>✅ 保存済み</span>
-              ) : (
-                <button onClick={() => handleSave(article)}>保存</button>
-              )}
+            <div className="p-4">
+              <h2 className="font-semibold text-gray-900 mb-1">{article.title}</h2>
+              <p className="text-sm text-gray-600 mb-3">{article.description}</p>
+              <div className="flex items-center justify-between">
+                <small className="text-xs text-gray-400">
+                  {article.source.name} · {new Date(article.publishedAt).toLocaleDateString("ja-JP")}
+                </small>
+                {saved.has(article.url) ? (
+                  <span className="text-xs text-green-600 font-medium">✓ 保存済み</span>
+                ) : (
+                  <button
+                    onClick={() => handleSave(article)}
+                    disabled={saving.has(article.url)}
+                    className="text-sm bg-primary text-white px-3 py-1 rounded-md hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {saving.has(article.url) ? "保存中..." : "保存"}
+                  </button>
+                )}
+              </div>
             </div>
           </article>
         ))}
