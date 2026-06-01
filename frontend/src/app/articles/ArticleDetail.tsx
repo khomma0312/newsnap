@@ -1,20 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { getArticle, deleteArticle, regenerateSummary } from "@/lib/api";
-import type { Article } from "@/types";
+import { getArticle, deleteArticle, regenerateSummary, getTags, addTagToArticle, removeTagFromArticle } from "@/lib/api";
+import type { Article, Tag } from "@/types";
 
-export default function ArticleDetailPage() {
-  const { id } = useParams<{ id: string }>();
+export default function ArticleDetail() {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id") ?? "";
   const router = useRouter();
   const [article, setArticle] = useState<Article | null>(null);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (!id) { router.replace("/"); return; }
     getArticle(id).then(setArticle).catch(console.error);
-  }, [id]);
+    getTags().then(setAllTags).catch(console.error);
+  }, [id, router]);
 
   const handleDelete = async () => {
     if (!confirm("記事を削除しますか？")) return;
@@ -29,7 +33,22 @@ export default function ArticleDetailPage() {
     setLoading(false);
   };
 
+  const handleAddTag = async (tagId: string) => {
+    await addTagToArticle(id, tagId);
+    const updated = await getArticle(id);
+    setArticle(updated);
+  };
+
+  const handleRemoveTag = async (tagId: string) => {
+    await removeTagFromArticle(id, tagId);
+    const updated = await getArticle(id);
+    setArticle(updated);
+  };
+
   if (!article) return <p className="text-center text-gray-400 py-12">読み込み中...</p>;
+
+  const attachedTagIds = new Set(article.tags.map((t) => t.id));
+  const availableTags = allTags.filter((t) => !attachedTagIds.has(t.id));
 
   return (
     <main className="max-w-3xl mx-auto px-6 py-8">
@@ -60,14 +79,41 @@ export default function ArticleDetailPage() {
 
       <section className="bg-white border border-gray-200 rounded-lg p-5 mb-4">
         <h2 className="font-semibold text-gray-900 mb-3">タグ</h2>
-        <div className="flex flex-wrap gap-2">
+
+        <div className="flex flex-wrap gap-2 mb-4">
           {article.tags.map((tag) => (
-            <span key={tag.id} className="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">
+            <span
+              key={tag.id}
+              className="inline-flex items-center gap-1 text-xs bg-primary text-white px-2.5 py-1 rounded-full"
+            >
               {tag.name}
+              <button
+                onClick={() => handleRemoveTag(tag.id)}
+                className="hover:opacity-70 leading-none"
+                aria-label={`${tag.name}を外す`}
+              >
+                ×
+              </button>
             </span>
           ))}
-          {article.tags.length === 0 && <span className="text-sm text-gray-400">タグなし</span>}
+          {article.tags.length === 0 && (
+            <span className="text-sm text-gray-400">タグなし</span>
+          )}
         </div>
+
+        {availableTags.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {availableTags.map((tag) => (
+              <button
+                key={tag.id}
+                onClick={() => handleAddTag(tag.id)}
+                className="text-xs border border-gray-300 text-gray-600 px-2.5 py-1 rounded-full hover:border-primary hover:text-primary transition-colors"
+              >
+                + {tag.name}
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       <div className="flex items-center justify-between">

@@ -71,12 +71,12 @@ export default function HomePage() {
             )}
             <div className="p-4">
               <h2 className="font-semibold text-gray-900 mb-1">
-                <Link href={`/articles/${article.id}`} className="hover:text-primary">
+                <Link href={`/articles?id=${article.id}`} className="hover:text-primary">
                   {article.title}
                 </Link>
               </h2>
               <p className="text-sm text-gray-600 mb-3">{article.summary?.slice(0, 150)}</p>
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap mb-3">
                 {article.tags.map((tag) => (
                   <span key={tag.id} className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
                     {tag.name}
@@ -86,6 +86,12 @@ export default function HomePage() {
                   {new Date(article.createdAt).toLocaleDateString("ja-JP")}
                 </small>
               </div>
+              <Link
+                href={`/articles?id=${article.id}`}
+                className="text-sm text-primary hover:text-primary-dark font-medium"
+              >
+                詳細を見る →
+              </Link>
             </div>
           </article>
         ))}

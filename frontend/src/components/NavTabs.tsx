@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 const TABS = [
   { href: "/", label: "保存済み記事" },
   { href: "/explore", label: "ニュースを探す" },
+  { href: "/tags", label: "タグ管理" },
 ];
 
 export default function NavTabs() {
