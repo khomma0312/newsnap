@@ -4,9 +4,7 @@ import { useEffect, useState } from "react";
 import { isLoggedIn, buildLoginUrl, buildLogoutUrl, clearTokens } from "@/lib/auth";
 
 export default function Header() {
-  const [loggedIn, setLoggedIn] = useState<boolean | null>(() =>
-    typeof window === "undefined" ? null : isLoggedIn()
-  );
+  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
     setLoggedIn(isLoggedIn());

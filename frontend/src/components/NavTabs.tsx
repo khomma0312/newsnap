@@ -12,9 +12,7 @@ const TABS = [
 
 export default function NavTabs() {
   const pathname = usePathname();
-  const [loggedIn, setLoggedIn] = useState(() =>
-    typeof window === "undefined" ? false : isLoggedIn()
-  );
+  const [loggedIn, setLoggedIn] = useState(false);
 
   useEffect(() => {
     setLoggedIn(isLoggedIn());
