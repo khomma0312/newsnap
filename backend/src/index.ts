@@ -22,10 +22,12 @@ app.use(
 );
 
 // 認証不要エンドポイント
-app.route("/auth", authRouter);
+app.route("/api/auth", authRouter);
 
 // 認証保護エンドポイント
-app.use("/api/*", authMiddleware);
+app.use("/api/articles/*", authMiddleware);
+app.use("/api/tags/*", authMiddleware);
+app.use("/api/explore/*", authMiddleware);
 app.route("/api/articles", articlesRouter);
 app.route("/api/tags", tagsRouter);
 app.route("/api/explore", exploreRouter);

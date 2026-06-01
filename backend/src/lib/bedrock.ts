@@ -1,5 +1,5 @@
 /**
- * AWS Bedrock（Claude 3 Haiku）で記事の要約を生成する
+ * AWS Bedrock（Claude Sonnet 4.6）で記事の要約を生成する
  */
 
 import {
@@ -11,7 +11,7 @@ const client = new BedrockRuntimeClient({
   region: process.env.AWS_REGION ?? "ap-northeast-1",
 });
 
-const MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0";
+const MODEL_ID = "us.anthropic.claude-sonnet-4-6";
 
 export async function generateSummary(
   title: string,
