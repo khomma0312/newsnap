@@ -1,19 +1,12 @@
 "use client";
 
-/**
- * /callback  Cognito 認証後のコールバック処理
- *
- * Cognito Hosted UI から authorization_code が渡される。
- * バックエンドの /auth/token エンドポイントにコードを渡し、
- * 取得したトークンを localStorage に保存してトップへリダイレクト。
- */
-
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { saveTokens } from "@/lib/auth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
-export default function CallbackPage() {
+function CallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -24,18 +17,26 @@ export default function CallbackPage() {
       return;
     }
 
-    fetch(`${API_URL}/auth/token`, {
+    fetch(`${API_URL}/api/auth/token`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code }),
     })
       .then((res) => res.json())
-      .then((data: { id_token: string }) => {
-        localStorage.setItem("id_token", data.id_token);
+      .then((data: { id_token: string; refresh_token?: string }) => {
+        saveTokens(data.id_token, data.refresh_token);
         router.replace("/");
       })
       .catch(() => router.replace("/"));
   }, [router, searchParams]);
 
   return <p>ログイン処理中...</p>;
+}
+
+export default function CallbackPage() {
+  return (
+    <Suspense fallback={<p>ログイン処理中...</p>}>
+      <CallbackContent />
+    </Suspense>
+  );
 }

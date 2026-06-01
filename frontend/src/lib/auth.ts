@@ -24,21 +24,55 @@ export function buildLogoutUrl(): string {
   return `${COGNITO_DOMAIN}/logout?${params}`;
 }
 
-export function saveTokens(params: URLSearchParams): void {
-  const idToken = params.get("id_token");
-  if (idToken) localStorage.setItem("id_token", idToken);
-}
-
-export function clearTokens(): void {
-  localStorage.removeItem("id_token");
-}
-
 export function getIdToken(): string | null {
   return typeof window !== "undefined"
     ? localStorage.getItem("id_token")
     : null;
 }
 
+export function getRefreshToken(): string | null {
+  return typeof window !== "undefined"
+    ? localStorage.getItem("refresh_token")
+    : null;
+}
+
+export function saveTokens(idToken: string, refreshToken?: string): void {
+  localStorage.setItem("id_token", idToken);
+  if (refreshToken) localStorage.setItem("refresh_token", refreshToken);
+}
+
+export function clearTokens(): void {
+  localStorage.removeItem("id_token");
+  localStorage.removeItem("refresh_token");
+}
+
 export function isLoggedIn(): boolean {
   return !!getIdToken();
+}
+
+/** id_token の payload を base64 デコードして返す（署名検証なし）*/
+function decodeTokenPayload(token: string): Record<string, unknown> {
+  const payload = token.split(".")[1];
+  return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+}
+
+export async function refreshIdToken(): Promise<string | null> {
+  const refreshToken = getRefreshToken();
+  const idToken = getIdToken();
+  if (!refreshToken || !idToken) return null;
+
+  const payload = decodeTokenPayload(idToken);
+  const username = (payload["cognito:username"] ?? payload["sub"]) as string;
+
+  const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+  const res = await fetch(`${API_URL}/api/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: refreshToken, username }),
+  });
+
+  if (!res.ok) return null;
+  const data = await res.json() as { id_token: string };
+  saveTokens(data.id_token);
+  return data.id_token;
 }
