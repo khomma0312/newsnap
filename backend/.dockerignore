@@ -3,5 +3,4 @@ dist/
 .env
 .env.*
 docker/
-drizzle.config.ts
 *.md
