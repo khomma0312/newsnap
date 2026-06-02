@@ -1,0 +1,94 @@
+name: DB Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Migration target environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+
+jobs:
+  migrate:
+    name: Run DB Migration (${{ github.event.inputs.environment }})
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment == 'prod' && 'Production' || 'Development' }}
+
+    permissions:
+      id-token: write  # OIDC認証に必要
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_IAM_ROLE_ARN }}
+          aws-region: ap-northeast-1
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push migration image
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          REPOSITORY: ${{ secrets.MIGRATION_ECR_REPOSITORY }}
+        run: |
+          IMAGE_URI="$REGISTRY/$REPOSITORY:${{ github.sha }}"
+          IMAGE_LATEST="$REGISTRY/$REPOSITORY:latest"
+          docker build \
+            --target migrate \
+            -t "$IMAGE_URI" \
+            -t "$IMAGE_LATEST" \
+            -f backend/docker/Dockerfile \
+            backend/
+          docker push "$IMAGE_URI"
+          docker push "$IMAGE_LATEST"
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+      - name: Run ECS migration task
+        id: run-task
+        run: |
+          TASK_ARN=$(aws ecs run-task \
+            --cluster ${{ secrets.MIGRATION_ECS_CLUSTER_NAME }} \
+            --task-definition ${{ secrets.ECS_MIGRATION_TASK_DEF }} \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={
+              subnets=[${{ secrets.PRIVATE_SUBNET_IDS }}],
+              securityGroups=[${{ secrets.MIGRATION_SG_ID }}],
+              assignPublicIp=DISABLED
+            }" \
+            --overrides "{\"containerOverrides\":[{\"name\":\"migration\",\"image\":\"$IMAGE_URI\"}]}" \
+            --query 'tasks[0].taskArn' \
+            --output text)
+          echo "task-arn=$TASK_ARN" >> $GITHUB_OUTPUT
+          echo "Started ECS task: $TASK_ARN"
+
+      - name: Wait for task to complete
+        run: |
+          aws ecs wait tasks-stopped \
+            --cluster ${{ secrets.MIGRATION_ECS_CLUSTER_NAME }} \
+            --tasks "${{ steps.run-task.outputs.task-arn }}"
+
+      - name: Check task exit code
+        run: |
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster ${{ secrets.MIGRATION_ECS_CLUSTER_NAME }} \
+            --tasks "${{ steps.run-task.outputs.task-arn }}" \
+            --query 'tasks[0].containers[0].exitCode' \
+            --output text)
+          echo "Container exit code: $EXIT_CODE"
+          if [ "$EXIT_CODE" != "0" ]; then
+            REASON=$(aws ecs describe-tasks \
+              --cluster ${{ secrets.MIGRATION_ECS_CLUSTER_NAME }} \
+              --tasks "${{ steps.run-task.outputs.task-arn }}" \
+              --query 'tasks[0].stoppedReason' \
+              --output text)
+            echo "Task stopped reason: $REASON"
+            exit 1
+          fi
+          echo "Migration succeeded"
