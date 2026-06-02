@@ -33,10 +33,12 @@ COPY --chown=node:node package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 # ===== build =====
-FROM base AS build
-COPY --chown=node:node . /app
-# ビルドに必要なdevDependenciesもインストール & ビルド実行
-RUN npm ci && npm run build
+FROM node AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
 
 # ===== dev =====
 FROM base AS dev
