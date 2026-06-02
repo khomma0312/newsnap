@@ -36,7 +36,7 @@ jobs:
       - name: Build and push migration image
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          REPOSITORY: ${{ secrets.MIGRATION_ECR_REPOSITORY }}
+          REPOSITORY: ${{ vars.MIGRATION_ECR_REPOSITORY }}
         run: |
           IMAGE_URI="$REGISTRY/$REPOSITORY:${{ github.sha }}"
           IMAGE_LATEST="$REGISTRY/$REPOSITORY:latest"
@@ -54,12 +54,12 @@ jobs:
         id: run-task
         run: |
           TASK_ARN=$(aws ecs run-task \
-            --cluster ${{ secrets.MIGRATION_ECS_CLUSTER_NAME }} \
-            --task-definition ${{ secrets.ECS_MIGRATION_TASK_DEF }} \
+            --cluster ${{ vars.MIGRATION_ECS_CLUSTER_NAME }} \
+            --task-definition ${{ vars.ECS_MIGRATION_TASK_DEF }} \
             --launch-type FARGATE \
             --network-configuration "awsvpcConfiguration={
-              subnets=[${{ secrets.PRIVATE_SUBNET_IDS }}],
-              securityGroups=[${{ secrets.MIGRATION_SG_ID }}],
+              subnets=[${{ vars.PRIVATE_SUBNET_IDS }}],
+              securityGroups=[${{ vars.MIGRATION_SG_ID }}],
               assignPublicIp=DISABLED
             }" \
               --query 'tasks[0].taskArn' \
@@ -70,20 +70,20 @@ jobs:
       - name: Wait for task to complete
         run: |
           aws ecs wait tasks-stopped \
-            --cluster ${{ secrets.MIGRATION_ECS_CLUSTER_NAME }} \
+            --cluster ${{ vars.MIGRATION_ECS_CLUSTER_NAME }} \
             --tasks "${{ steps.run-task.outputs.task-arn }}"
 
       - name: Check task exit code
         run: |
           EXIT_CODE=$(aws ecs describe-tasks \
-            --cluster ${{ secrets.MIGRATION_ECS_CLUSTER_NAME }} \
+            --cluster ${{ vars.MIGRATION_ECS_CLUSTER_NAME }} \
             --tasks "${{ steps.run-task.outputs.task-arn }}" \
             --query 'tasks[0].containers[0].exitCode' \
             --output text)
           echo "Container exit code: $EXIT_CODE"
           if [ "$EXIT_CODE" != "0" ]; then
             REASON=$(aws ecs describe-tasks \
-              --cluster ${{ secrets.MIGRATION_ECS_CLUSTER_NAME }} \
+              --cluster ${{ vars.MIGRATION_ECS_CLUSTER_NAME }} \
               --tasks "${{ steps.run-task.outputs.task-arn }}" \
               --query 'tasks[0].stoppedReason' \
               --output text)
