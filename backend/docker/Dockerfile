@@ -46,6 +46,10 @@ RUN npm install --only=development
 COPY --chown=node:node . /app
 CMD ["npm", "run", "dev"]
 
+# ===== migrate =====
+FROM build AS migrate
+CMD ["npm", "run", "db:migrate"]
+
 # ===== prod ======
 FROM base AS prod
 COPY --chown=node:node --from=build /app/dist ./dist
