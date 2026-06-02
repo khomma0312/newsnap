@@ -8,7 +8,10 @@ const connectionString =
   DATABASE_URL ??
   `postgresql://${DB_USER}:${encodeURIComponent(DB_PASSWORD ?? "")}@${DB_HOST}/${DB_NAME}${DB_SSL === "true" ? "?ssl=true" : ""}`;
 
-const client = postgres(connectionString, { max: 1 });
+const client = postgres(connectionString, {
+  max: 1,
+  ...(DB_SSL === "true" && { ssl: { rejectUnauthorized: false } }),
+});
 const db = drizzle(client);
 
 migrate(db, { migrationsFolder: "./drizzle" })

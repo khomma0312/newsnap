@@ -8,6 +8,8 @@ const connectionString =
   DATABASE_URL ??
   `postgresql://${DB_USER}:${encodeURIComponent(DB_PASSWORD ?? "")}@${DB_HOST}/${DB_NAME}${DB_SSL === "true" ? "?ssl=true" : ""}`;
 
-const client = postgres(connectionString);
+const client = postgres(connectionString, {
+  ...(DB_SSL === "true" && { ssl: { rejectUnauthorized: false } }),
+});
 
 export const db = drizzle(client, { schema });
