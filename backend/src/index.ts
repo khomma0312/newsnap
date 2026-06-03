@@ -13,7 +13,10 @@ import { logger } from "./lib/logger.js";
 const app = new Hono();
 
 // ミドルウェア
-app.use("*", honoLogger());
+app.use("*", (c, next) => {
+  if (c.req.path === "/health") return next();
+  return honoLogger()(c, next);
+});
 app.use(
   "*",
   cors({
