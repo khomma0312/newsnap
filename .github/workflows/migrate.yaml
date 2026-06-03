@@ -11,6 +11,9 @@ on:
           - dev
           - prod
 
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+
 jobs:
   migrate:
     name: Run DB Migration (${{ github.event.inputs.environment }})
@@ -23,12 +26,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        name: Checkout code
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.AWS_IAM_ROLE_ARN }}
-          aws-region: ap-northeast-1
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: ecr-login
