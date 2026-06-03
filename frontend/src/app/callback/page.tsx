@@ -30,6 +30,10 @@ function CallbackContent() {
         saveTokens(data.id_token, data.refresh_token);
         window.location.href = "/";
       })
+      .catch((err) => {
+        console.error("Token exchange error:", err);
+        router.replace("/");
+      });
   }, [router, searchParams]);
 
   return <p>ログイン処理中...</p>;
