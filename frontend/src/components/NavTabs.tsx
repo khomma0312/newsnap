@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { isLoggedIn } from "@/lib/auth";
-import { useEffect, useState } from "react";
+import { useIsLoggedIn } from "@/hooks/useIsLoggedIn";
 
 const TABS = [
   { href: "/", label: "保存済み記事" },
@@ -13,11 +12,7 @@ const TABS = [
 
 export default function NavTabs() {
   const pathname = usePathname();
-  const [loggedIn, setLoggedIn] = useState(false);
-
-  useEffect(() => {
-    setLoggedIn(isLoggedIn());
-  }, []);
+  const loggedIn = useIsLoggedIn();
 
   if (!loggedIn) return null;
 

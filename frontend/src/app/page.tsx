@@ -3,22 +3,21 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getArticles } from "@/lib/api";
-import { isLoggedIn, buildLoginUrl } from "@/lib/auth";
+import { buildLoginUrl } from "@/lib/auth";
+import { useIsLoggedIn } from "@/hooks/useIsLoggedIn";
 import type { Article } from "@/types";
 
 export default function HomePage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [keyword, setKeyword] = useState("");
   const [selectedTagIds] = useState<string[]>([]);
-  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const loggedIn = useIsLoggedIn();
 
   useEffect(() => {
-    const authenticated = isLoggedIn();
-    setLoggedIn(authenticated);
-    if (authenticated) {
+    if (loggedIn) {
       getArticles().then(setArticles).catch(console.error);
     }
-  }, []);
+  }, [loggedIn]);
 
   const filtered = articles.filter((a) => {
     const matchesKeyword =
@@ -30,8 +29,6 @@ export default function HomePage() {
       selectedTagIds.every((id) => a.tags.some((t) => t.id === id));
     return matchesKeyword && matchesTags;
   });
-
-  if (loggedIn === null) return null;
 
   if (!loggedIn) {
     return (

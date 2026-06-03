@@ -1,14 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { isLoggedIn, buildLoginUrl, buildLogoutUrl, clearTokens } from "@/lib/auth";
+import { buildLoginUrl, buildLogoutUrl, clearTokens } from "@/lib/auth";
+import { useIsLoggedIn } from "@/hooks/useIsLoggedIn";
 
 export default function Header() {
-  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    setLoggedIn(isLoggedIn());
-  }, []);
+  const loggedIn = useIsLoggedIn();
 
   function handleLogout() {
     clearTokens();
@@ -29,7 +25,7 @@ export default function Header() {
       height: "3.5rem",
     }}>
       <span style={{ fontWeight: 700, fontSize: "1.1rem", color: "#111827" }}>Newsnap</span>
-      {loggedIn === true && (
+      {loggedIn && (
         <button
           onClick={handleLogout}
           style={{ fontSize: "0.875rem", color: "#4b5563", cursor: "pointer", background: "none", border: "none" }}
@@ -37,7 +33,7 @@ export default function Header() {
           ログアウト
         </button>
       )}
-      {loggedIn === false && (
+      {!loggedIn && (
         <a
           href={buildLoginUrl()}
           style={{
