@@ -60,7 +60,7 @@ jobs:
         run: |
           TASK_ARN=$(aws ecs run-task \
             --cluster ${{ vars.MIGRATION_ECS_CLUSTER_NAME }} \
-            --task-definition ${{ vars.ECS_MIGRATION_TASK_DEF }} \
+            --task-definition ${{ vars.MIGRATION_ECS_TASK_DEF }} \
             --launch-type FARGATE \
             --network-configuration "awsvpcConfiguration={
               subnets=[${{ vars.PRIVATE_SUBNET_IDS }}],
