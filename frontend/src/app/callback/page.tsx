@@ -12,6 +12,7 @@ function CallbackContent() {
 
   useEffect(() => {
     const code = searchParams.get("code");
+    console.log("[callback] searchParams:", searchParams.toString(), "code:", code);
     if (!code) {
       router.replace("/");
       return;
