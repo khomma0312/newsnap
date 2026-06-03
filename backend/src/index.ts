@@ -1,18 +1,19 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
+import { logger as honoLogger } from "hono/logger";
 
 import { authMiddleware } from "./middleware/auth.js";
 import articlesRouter from "./routes/articles.js";
 import tagsRouter from "./routes/tags.js";
 import exploreRouter from "./routes/explore.js";
 import authRouter from "./routes/auth.js";
+import { logger } from "./lib/logger.js";
 
 const app = new Hono();
 
 // ミドルウェア
-app.use("*", logger());
+app.use("*", honoLogger());
 app.use(
   "*",
   cors({
@@ -36,6 +37,6 @@ app.route("/api/explore", exploreRouter);
 app.get("/health", (c) => c.json({ status: "ok" }));
 
 const port = Number(3001);
-console.log(`Backend listening on port ${port}`);
+logger.info({ port }, "Backend started");
 
 serve({ fetch: app.fetch, port });

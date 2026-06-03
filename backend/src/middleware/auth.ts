@@ -7,6 +7,7 @@
 
 import type { MiddlewareHandler } from "hono";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { logger } from "../lib/logger.js";
 
 const REGION = process.env.AWS_REGION ?? "ap-northeast-1";
 const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID ?? "";
@@ -33,7 +34,8 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
 
     c.set("userId", payload.sub as string);
     await next();
-  } catch {
+  } catch (err) {
+    logger.warn({ err, path: c.req.path }, "Auth failed");
     return c.json({ error: "Unauthorized" }, 401);
   }
 };

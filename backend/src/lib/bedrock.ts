@@ -6,6 +6,7 @@ import {
   BedrockRuntimeClient,
   InvokeModelCommand,
 } from "@aws-sdk/client-bedrock-runtime";
+import { logger } from "./logger.js";
 
 const client = new BedrockRuntimeClient({
   region: process.env.AWS_REGION ?? "ap-northeast-1",
@@ -37,7 +38,10 @@ export async function generateSummary(
     body,
   });
 
+  const start = Date.now();
   const response = await client.send(command);
+  logger.info({ modelId: MODEL_ID, durationMs: Date.now() - start }, "Bedrock invoked");
+
   const result = JSON.parse(new TextDecoder().decode(response.body));
   return result.content?.[0]?.text ?? "";
 }

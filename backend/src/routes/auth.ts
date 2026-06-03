@@ -8,6 +8,7 @@
 import { Hono } from "hono";
 import { CognitoIdentityProviderClient, InitiateAuthCommand } from "@aws-sdk/client-cognito-identity-provider";
 import { createHmac } from "crypto";
+import { logger } from "../lib/logger.js";
 
 const router = new Hono();
 
@@ -47,10 +48,13 @@ router.post("/token", async (c) => {
   });
 
   if (!res.ok) {
+    const body = await res.text();
+    logger.warn({ status: res.status, body }, "Token exchange failed");
     return c.json({ error: "Token exchange failed" }, 400);
   }
 
   const tokens = await res.json() as { id_token: string; refresh_token: string };
+  logger.info("Token exchange succeeded");
   return c.json({ id_token: tokens.id_token, refresh_token: tokens.refresh_token });
 });
 
@@ -79,7 +83,8 @@ router.post("/refresh", async (c) => {
       return c.json({ error: "Refresh failed" }, 400);
     }
     return c.json({ id_token: idToken });
-  } catch {
+  } catch (err) {
+    logger.warn({ err }, "Token refresh failed");
     return c.json({ error: "Refresh failed" }, 400);
   }
 });
