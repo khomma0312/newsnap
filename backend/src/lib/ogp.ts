@@ -23,7 +23,7 @@ export async function fetchOgp(url: string): Promise<OgpData> {
     return match?.[1] ?? null;
   };
 
-  const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ?? "";
+  const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ?? null;
 
   return {
     title: get("title") ?? titleTag ?? url,
