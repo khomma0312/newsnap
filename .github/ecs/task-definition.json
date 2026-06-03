@@ -1,0 +1,80 @@
+{
+  "family": "<ENV>-<APP_NAME>-backend",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "<EXECUTION_ROLE_ARN>",
+  "taskRoleArn": "<TASK_ROLE_ARN>",
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "<IMAGE_URI>",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 3001,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "AWS_REGION", "value": "<AWS_REGION>" },
+        { "name": "DB_SSL",     "value": "true" }
+      ],
+      "secrets": [
+        {
+          "name":      "FRONTEND_URL",
+          "valueFrom": "<SSM_ARN_FRONTEND_URL>"
+        },
+        {
+          "name":      "DB_HOST",
+          "valueFrom": "<SSM_ARN_DB_HOST>"
+        },
+        {
+          "name":      "DB_NAME",
+          "valueFrom": "<SSM_ARN_DB_NAME>"
+        },
+        {
+          "name":      "DB_USER",
+          "valueFrom": "<SECRET_ARN_DB_USER>"
+        },
+        {
+          "name":      "DB_PASSWORD",
+          "valueFrom": "<SECRET_ARN_DB_PASSWORD>"
+        },
+        {
+          "name":      "COGNITO_USER_POOL_ID",
+          "valueFrom": "<SSM_ARN_COGNITO_USER_POOL_ID>"
+        },
+        {
+          "name":      "COGNITO_CLIENT_ID",
+          "valueFrom": "<SSM_ARN_COGNITO_CLIENT_ID>"
+        },
+        {
+          "name":      "COGNITO_CLIENT_SECRET",
+          "valueFrom": "<SECRET_ARN_COGNITO_CLIENT_SECRET>"
+        },
+        {
+          "name":      "COGNITO_DOMAIN",
+          "valueFrom": "<SSM_ARN_COGNITO_DOMAIN>"
+        },
+        {
+          "name":      "COGNITO_REDIRECT_URI",
+          "valueFrom": "<SSM_ARN_COGNITO_REDIRECT_URI>"
+        },
+        {
+          "name":      "NEWS_API_KEY",
+          "valueFrom": "<SSM_ARN_NEWS_API_KEY>"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group":         "/ecs/<ENV>-<APP_NAME>-backend",
+          "awslogs-region":        "<AWS_REGION>",
+          "awslogs-stream-prefix": "backend"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,206 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - "develop"
+      - "main"
+    paths:
+      - frontend/**
+      - backend/**
+      - .github/workflows/deploy.yaml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+
+jobs:
+  deploy-backend:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/main' && 'Production' || 'Development' }}
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      previous-task-def-revision: ${{ steps.get-current-revision.outputs.revision }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_IAM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          REPOSITORY: ${{ vars.BACKEND_ECR_REPOSITORY }}
+        run: |
+          IMAGE_URI="$REGISTRY/$REPOSITORY:${{ github.sha }}"
+          docker build \
+            --target prod \
+            -t "$IMAGE_URI" \
+            -f backend/docker/Dockerfile \
+            backend/
+          docker push "$IMAGE_URI"
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+      - name: Get current task definition revision
+        id: get-current-revision
+        run: |
+          REVISION=$(aws ecs describe-services \
+            --cluster ${{ vars.ECS_CLUSTER_NAME }} \
+            --services ${{ vars.ECS_SERVICE_NAME }} \
+            --query 'services[0].taskDefinition' \
+            --output text | grep -oE '[0-9]+$')
+          echo "revision=$REVISION" >> $GITHUB_OUTPUT
+
+      - name: Register new task definition
+        id: register-task-def
+        env:
+          ENV_NAME: ${{ github.ref == 'refs/heads/main' && 'prd' || 'dev' }}
+        run: |
+          TASK_DEF=$(sed \
+            -e "s|<ENV>|$ENV_NAME|g" \
+            -e "s|<APP_NAME>|${{ vars.APP_NAME }}|g" \
+            -e "s|<AWS_REGION>|${{ env.AWS_REGION }}|g" \
+            -e "s|<IMAGE_URI>|$IMAGE_URI|g" \
+            -e "s|<EXECUTION_ROLE_ARN>|${{ vars.ECS_EXECUTION_ROLE_ARN }}|g" \
+            -e "s|<TASK_ROLE_ARN>|${{ vars.ECS_TASK_ROLE_ARN }}|g" \
+            -e "s|<SSM_ARN_FRONTEND_URL>|${{ vars.SSM_ARN_FRONTEND_URL }}|g" \
+            -e "s|<SSM_ARN_DB_HOST>|${{ vars.SSM_ARN_DB_HOST }}|g" \
+            -e "s|<SSM_ARN_DB_NAME>|${{ vars.SSM_ARN_DB_NAME }}|g" \
+            -e "s|<SECRET_ARN_DB_USER>|${{ vars.SECRET_ARN_DB_USER }}|g" \
+            -e "s|<SECRET_ARN_DB_PASSWORD>|${{ vars.SECRET_ARN_DB_PASSWORD }}|g" \
+            -e "s|<SSM_ARN_COGNITO_USER_POOL_ID>|${{ vars.SSM_ARN_COGNITO_USER_POOL_ID }}|g" \
+            -e "s|<SSM_ARN_COGNITO_CLIENT_ID>|${{ vars.SSM_ARN_COGNITO_CLIENT_ID }}|g" \
+            -e "s|<SECRET_ARN_COGNITO_CLIENT_SECRET>|${{ vars.SECRET_ARN_COGNITO_CLIENT_SECRET }}|g" \
+            -e "s|<SSM_ARN_COGNITO_DOMAIN>|${{ vars.SSM_ARN_COGNITO_DOMAIN }}|g" \
+            -e "s|<SSM_ARN_COGNITO_REDIRECT_URI>|${{ vars.SSM_ARN_COGNITO_REDIRECT_URI }}|g" \
+            -e "s|<SSM_ARN_NEWS_API_KEY>|${{ vars.SSM_ARN_NEWS_API_KEY }}|g" \
+            .github/ecs/task-definition.json)
+          NEW_REVISION=$(aws ecs register-task-definition \
+            --cli-input-json "$TASK_DEF" \
+            --query 'taskDefinition.revision' \
+            --output text)
+          echo "new-revision=$NEW_REVISION" >> $GITHUB_OUTPUT
+
+      - name: Update ECS service
+        run: |
+          aws ecs update-service \
+            --cluster ${{ vars.ECS_CLUSTER_NAME }} \
+            --service ${{ vars.ECS_SERVICE_NAME }} \
+            --task-definition ${{ vars.ECS_TASK_DEF_NAME }}:${{ steps.register-task-def.outputs.new-revision }}
+          aws ecs wait services-stable \
+            --cluster ${{ vars.ECS_CLUSTER_NAME }} \
+            --services ${{ vars.ECS_SERVICE_NAME }}
+
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: deploy-backend
+    environment: ${{ github.ref == 'refs/heads/main' && 'Production' || 'Development' }}
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      previous-hash: ${{ steps.get-previous-hash.outputs.hash }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_IAM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build
+        run: npm run build
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_COGNITO_DOMAIN: ${{ vars.NEXT_PUBLIC_COGNITO_DOMAIN }}
+          NEXT_PUBLIC_COGNITO_CLIENT_ID: ${{ vars.NEXT_PUBLIC_COGNITO_CLIENT_ID }}
+          NEXT_PUBLIC_REDIRECT_URI: ${{ vars.NEXT_PUBLIC_REDIRECT_URI }}
+          NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
+
+      - name: Get previous frontend hash
+        id: get-previous-hash
+        run: |
+          HASH=$(aws s3 cp s3://${{ vars.FRONTEND_BUCKET }}/.version - 2>/dev/null || echo "")
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
+
+      - name: Upload build to S3
+        run: |
+          aws s3 sync frontend/out/ s3://${{ vars.FRONTEND_BUCKET }}/${{ github.sha }}/
+
+      - name: Switch current version
+        run: |
+          aws s3 sync s3://${{ vars.FRONTEND_BUCKET }}/${{ github.sha }}/ \
+            s3://${{ vars.FRONTEND_BUCKET }}/current/ --delete
+          echo "${{ github.sha }}" | aws s3 cp - s3://${{ vars.FRONTEND_BUCKET }}/.version
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+
+  rollback:
+    name: Rollback
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-frontend]
+    if: needs.deploy-frontend.result == 'failure' && needs.deploy-backend.result == 'success'
+    environment: ${{ github.ref == 'refs/heads/main' && 'Production' || 'Development' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_IAM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Rollback ECS service
+        run: |
+          aws ecs update-service \
+            --cluster ${{ vars.ECS_CLUSTER_NAME }} \
+            --service ${{ vars.ECS_SERVICE_NAME }} \
+            --task-definition ${{ vars.ECS_TASK_DEF_NAME }}:${{ needs.deploy-backend.outputs.previous-task-def-revision }}
+          aws ecs wait services-stable \
+            --cluster ${{ vars.ECS_CLUSTER_NAME }} \
+            --services ${{ vars.ECS_SERVICE_NAME }}
+
+      - name: Rollback frontend
+        if: needs.deploy-frontend.outputs.previous-hash != ''
+        run: |
+          PREV_HASH="${{ needs.deploy-frontend.outputs.previous-hash }}"
+          aws s3 sync s3://${{ vars.FRONTEND_BUCKET }}/$PREV_HASH/ \
+            s3://${{ vars.FRONTEND_BUCKET }}/current/ --delete
+          echo "$PREV_HASH" | aws s3 cp - s3://${{ vars.FRONTEND_BUCKET }}/.version
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
