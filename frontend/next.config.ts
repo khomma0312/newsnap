@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
+  compiler: {
+    removeConsole: false,
+  },
 };
 
 export default nextConfig;
