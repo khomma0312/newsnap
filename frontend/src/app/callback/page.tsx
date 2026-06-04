@@ -9,13 +9,11 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 export default function CallbackPage() {
   const router = useRouter();
 
-  console.log("CallbackPage mounted, checking for authorization code...");
-
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get("code");
-    console.log("Authorization code received:", code);
+
     if (!code) {
-      // router.replace("/");
+      router.replace("/");
       return;
     }
 
@@ -26,17 +24,15 @@ export default function CallbackPage() {
     })
       .then((res) => {
         if (!res.ok) throw new Error(`Token exchange failed: ${res.status}`);
-        console.log("Token exchange succeeded");
         return res.json();
       })
       .then((data: { id_token: string; refresh_token?: string }) => {
         saveTokens(data.id_token, data.refresh_token);
-        console.log("Tokens saved, redirecting to home");
-        // window.location.href = "/";
+        window.location.href = "/";
       })
       .catch((err) => {
         console.error("Token exchange error:", err);
-        // router.replace("/");
+        router.replace("/");
       });
   }, [router]);
 
