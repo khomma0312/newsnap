@@ -16,6 +16,11 @@ concurrency:
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION }}
+  BACKEND_NAME: ${{ vars.ENV }}-${{ vars.APP_NAME }}-backend
+  FRONTEND_BUCKET: ${{ vars.ENV }}-${{ vars.APP_NAME }}-frontend
+  ECS_CLUSTER_NAME: ${{ vars.ENV }}-${{ vars.APP_NAME }}-cluster
+  # prodの場合はルートドメイン、devの場合はサブドメインを使用
+  APP_URL: ${{ github.ref == 'refs/heads/main' && format('https://{0}', vars.APP_DOMAIN) || format('https://{0}.{1}', vars.ENV, vars.APP_DOMAIN) }}
 
 jobs:
   deploy-backend:
@@ -44,7 +49,7 @@ jobs:
       - name: Build and push Docker image
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          REPOSITORY: ${{ vars.BACKEND_ECR_REPOSITORY }}
+          REPOSITORY: ${{ env.BACKEND_NAME }}
         run: |
           IMAGE_URI="$REGISTRY/$REPOSITORY:${{ github.sha }}"
           docker build \
@@ -59,8 +64,8 @@ jobs:
         id: get-current-revision
         run: |
           REVISION=$(aws ecs describe-services \
-            --cluster ${{ vars.ECS_CLUSTER_NAME }} \
-            --services ${{ vars.ECS_SERVICE_NAME }} \
+            --cluster ${{ env.ECS_CLUSTER_NAME }} \
+            --services ${{ env.BACKEND_NAME }} \
             --query 'services[0].taskDefinition' \
             --output text | grep -oE '[0-9]+$')
           echo "revision=$REVISION" >> $GITHUB_OUTPUT
@@ -68,7 +73,7 @@ jobs:
       - name: Register new task definition
         id: register-task-def
         env:
-          ENV_NAME: ${{ github.ref == 'refs/heads/main' && 'prd' || 'dev' }}
+          ENV_NAME: ${{ vars.ENV }}
         run: |
           TASK_DEF=$(sed \
             -e "s|<ENV>|$ENV_NAME|g" \
@@ -98,12 +103,12 @@ jobs:
       - name: Update ECS service
         run: |
           aws ecs update-service \
-            --cluster ${{ vars.ECS_CLUSTER_NAME }} \
-            --service ${{ vars.ECS_SERVICE_NAME }} \
-            --task-definition ${{ vars.ECS_TASK_DEF_NAME }}:${{ steps.register-task-def.outputs.new-revision }}
+            --cluster ${{ env.ECS_CLUSTER_NAME }} \
+            --service ${{ env.BACKEND_NAME }} \
+            --task-definition ${{ env.BACKEND_NAME }}:${{ steps.register-task-def.outputs.new-revision }}
           aws ecs wait services-stable \
-            --cluster ${{ vars.ECS_CLUSTER_NAME }} \
-            --services ${{ vars.ECS_SERVICE_NAME }}
+            --cluster ${{ env.ECS_CLUSTER_NAME }} \
+            --services ${{ env.BACKEND_NAME }}
 
   deploy-frontend:
     name: Deploy Frontend
@@ -140,27 +145,27 @@ jobs:
         run: npm run build
         working-directory: frontend
         env:
-          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_API_URL: ${{ env.APP_URL }}
+          NEXT_PUBLIC_APP_URL: ${{ env.APP_URL }}
+          NEXT_PUBLIC_REDIRECT_URI: ${{ env.APP_URL }}/callback
           NEXT_PUBLIC_COGNITO_DOMAIN: ${{ vars.NEXT_PUBLIC_COGNITO_DOMAIN }}
           NEXT_PUBLIC_COGNITO_CLIENT_ID: ${{ vars.NEXT_PUBLIC_COGNITO_CLIENT_ID }}
-          NEXT_PUBLIC_REDIRECT_URI: ${{ vars.NEXT_PUBLIC_REDIRECT_URI }}
-          NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
 
       - name: Get previous frontend hash
         id: get-previous-hash
         run: |
-          HASH=$(aws s3 cp s3://${{ vars.FRONTEND_BUCKET }}/.version - 2>/dev/null || echo "")
+          HASH=$(aws s3 cp s3://${{ env.FRONTEND_BUCKET }}/.version - 2>/dev/null || echo "")
           echo "hash=$HASH" >> $GITHUB_OUTPUT
 
       - name: Upload build to S3
         run: |
-          aws s3 sync frontend/out/ s3://${{ vars.FRONTEND_BUCKET }}/${{ github.sha }}/
+          aws s3 sync frontend/out/ s3://${{ env.FRONTEND_BUCKET }}/${{ github.sha }}/
 
       - name: Switch current version
         run: |
-          aws s3 sync s3://${{ vars.FRONTEND_BUCKET }}/${{ github.sha }}/ \
-            s3://${{ vars.FRONTEND_BUCKET }}/current/ --delete
-          echo "${{ github.sha }}" | aws s3 cp - s3://${{ vars.FRONTEND_BUCKET }}/.version
+          aws s3 sync s3://${{ env.FRONTEND_BUCKET }}/${{ github.sha }}/ \
+            s3://${{ env.FRONTEND_BUCKET }}/current/ --delete
+          echo "${{ github.sha }}" | aws s3 cp - s3://${{ env.FRONTEND_BUCKET }}/.version
 
       - name: Invalidate CloudFront cache
         run: |
@@ -187,20 +192,20 @@ jobs:
       - name: Rollback ECS service
         run: |
           aws ecs update-service \
-            --cluster ${{ vars.ECS_CLUSTER_NAME }} \
-            --service ${{ vars.ECS_SERVICE_NAME }} \
-            --task-definition ${{ vars.ECS_TASK_DEF_NAME }}:${{ needs.deploy-backend.outputs.previous-task-def-revision }}
+            --cluster ${{ env.ECS_CLUSTER_NAME }} \
+            --service ${{ env.BACKEND_NAME }} \
+            --task-definition ${{ env.BACKEND_NAME }}:${{ needs.deploy-backend.outputs.previous-task-def-revision }}
           aws ecs wait services-stable \
-            --cluster ${{ vars.ECS_CLUSTER_NAME }} \
-            --services ${{ vars.ECS_SERVICE_NAME }}
+            --cluster ${{ env.ECS_CLUSTER_NAME }} \
+            --services ${{ env.BACKEND_NAME }}
 
       - name: Rollback frontend
         if: needs.deploy-frontend.outputs.previous-hash != ''
         run: |
           PREV_HASH="${{ needs.deploy-frontend.outputs.previous-hash }}"
-          aws s3 sync s3://${{ vars.FRONTEND_BUCKET }}/$PREV_HASH/ \
-            s3://${{ vars.FRONTEND_BUCKET }}/current/ --delete
-          echo "$PREV_HASH" | aws s3 cp - s3://${{ vars.FRONTEND_BUCKET }}/.version
+          aws s3 sync s3://${{ env.FRONTEND_BUCKET }}/$PREV_HASH/ \
+            s3://${{ env.FRONTEND_BUCKET }}/current/ --delete
+          echo "$PREV_HASH" | aws s3 cp - s3://${{ env.FRONTEND_BUCKET }}/.version
           aws cloudfront create-invalidation \
             --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
             --paths "/*"
