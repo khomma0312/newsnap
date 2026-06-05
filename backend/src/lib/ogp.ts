@@ -10,24 +10,24 @@ type OgpData = {
 
 export async function fetchOgp(url: string): Promise<OgpData> {
   const res = await fetch(url, {
-    headers: { "User-Agent": "NewsnapBot/1.0" },
-    redirect: "follow",
+    headers: { 'User-Agent': 'NewsnapBot/1.0' },
+    redirect: 'follow',
   });
 
   const html = await res.text();
 
   const get = (property: string): string | null => {
     const match =
-      html.match(new RegExp(`<meta[^>]+property=["']og:${property}["'][^>]+content=["']([^"']+)["']`, "i")) ??
-      html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:${property}["']`, "i"));
+      new RegExp(`<meta[^>]+property=["']og:${property}["'][^>]+content=["']([^"']+)["']`, 'i').exec(html) ??
+      new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:${property}["']`, 'i').exec(html);
     return match?.[1] ?? null;
   };
 
-  const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ?? null;
+  const titleTag = /<title[^>]*>([^<]+)<\/title>/i.exec(html)?.[1] ?? null;
 
   return {
-    title: get("title") ?? titleTag ?? url,
-    description: get("description") ?? "",
-    image: get("image"),
+    title: get('title') ?? titleTag ?? url,
+    description: get('description') ?? '',
+    image: get('image'),
   };
 }
