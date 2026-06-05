@@ -2,22 +2,22 @@
  * /api/tags  タグ CRUD
  */
 
-import { Hono } from "hono";
-import { and, asc, count, eq } from "drizzle-orm";
-import { db } from "../db/client.js";
-import { articleTags, tags } from "../db/schema.js";
+import { and, asc, count, eq } from 'drizzle-orm';
+import { Hono } from 'hono';
+import { db } from '../db/client.js';
+import { articleTags, tags } from '../db/schema.js';
 
 const router = new Hono<{ Variables: { userId: string } }>();
 
 // GET /api/tags  （記事数付き）
-router.get("/", async (c) => {
-  const userId = c.get("userId");
+router.get('/', async (c) => {
+  const userId = c.get('userId');
 
   const rows = await db
     .select({
-      id:           tags.id,
-      userId:       tags.userId,
-      name:         tags.name,
+      id: tags.id,
+      userId: tags.userId,
+      name: tags.name,
       articleCount: count(articleTags.articleId),
     })
     .from(tags)
@@ -30,8 +30,8 @@ router.get("/", async (c) => {
 });
 
 // POST /api/tags
-router.post("/", async (c) => {
-  const userId = c.get("userId");
+router.post('/', async (c) => {
+  const userId = c.get('userId');
   const { name } = await c.req.json<{ name: string }>();
 
   const [tag] = await db.insert(tags).values({ userId, name }).returning();
@@ -39,29 +39,29 @@ router.post("/", async (c) => {
 });
 
 // PUT /api/tags/:id
-router.put("/:id", async (c) => {
-  const userId = c.get("userId");
+router.put('/:id', async (c) => {
+  const userId = c.get('userId');
   const { id } = c.req.param();
   const { name } = await c.req.json<{ name: string }>();
 
-  const [tag] = await db
+  const result = await db
     .update(tags)
     .set({ name })
     .where(and(eq(tags.id, id), eq(tags.userId, userId)))
     .returning();
 
-  if (!tag) return c.json({ error: "Not found" }, 404);
-  return c.json(tag);
+  if (result.length === 0) {
+    return c.json({ error: 'Not found' }, 404);
+  }
+  return c.json(result[0]);
 });
 
 // DELETE /api/tags/:id
-router.delete("/:id", async (c) => {
-  const userId = c.get("userId");
+router.delete('/:id', async (c) => {
+  const userId = c.get('userId');
   const { id } = c.req.param();
 
-  await db
-    .delete(tags)
-    .where(and(eq(tags.id, id), eq(tags.userId, userId)));
+  await db.delete(tags).where(and(eq(tags.id, id), eq(tags.userId, userId)));
 
   return c.body(null, 204);
 });

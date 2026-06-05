@@ -22,6 +22,7 @@ const INITIAL_TAGS = [
 
 describe("TagsPage", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(api.getTags).mockResolvedValue(INITIAL_TAGS);
   });
 

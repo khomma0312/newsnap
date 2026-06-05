@@ -1,17 +1,17 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { saveTokens } from "@/lib/auth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
-function CallbackContent() {
+export default function CallbackPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
-    const code = searchParams.get("code");
+    const code = new URLSearchParams(window.location.search).get("code");
+
     if (!code) {
       router.replace("/");
       return;
@@ -30,15 +30,11 @@ function CallbackContent() {
         saveTokens(data.id_token, data.refresh_token);
         window.location.href = "/";
       })
-  }, [router, searchParams]);
+      .catch((err) => {
+        console.error("Token exchange error:", err);
+        router.replace("/");
+      });
+  }, [router]);
 
   return <p>ログイン処理中...</p>;
-}
-
-export default function CallbackPage() {
-  return (
-    <Suspense fallback={<p>ログイン処理中...</p>}>
-      <CallbackContent />
-    </Suspense>
-  );
 }

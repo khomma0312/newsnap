@@ -65,7 +65,7 @@ describe("fetchWithAuth（API クライアント共通処理）", () => {
   it("レスポンスが ok でない場合は例外をスローする", async () => {
     mockFetch({ error: "Unauthorized" }, false, 401);
 
-    await expect(getArticles()).rejects.toThrow("API error: 401");
+    await expect(getArticles()).rejects.toThrow("Session expired");
   });
 });
 
