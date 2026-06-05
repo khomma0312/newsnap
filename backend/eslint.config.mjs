@@ -26,4 +26,9 @@ export default [
     plugins: { prettier },
     rules: { 'prettier/prettier': 'warn' },
   },
+  {
+    // migrate.ts はスクリプトなので process.exit() を許可
+    files: ['src/migrate.ts'],
+    rules: { 'n/no-process-exit': 'off' },
+  },
 ];
